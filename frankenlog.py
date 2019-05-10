@@ -54,6 +54,18 @@ class QSO:
 
         self.data.update(kwargs)
 
+        self.normalize_format()
+
+    def normalize_format(self):
+        if self.data['tx_num']:
+            self.data['tx_num'] = "{:03d}".format(int(self.data['tx_num']))
+        if self.data['rx_num']:
+            self.data['rx_num'] = "{:03d}".format(int(self.data['rx_num']))
+
+        for k in ['rx_call', 'rx_loc', 'rx_dok']:
+            if self.data[k]:
+                self.data[k] = self.data[k].upper()
+
     def serialize(self):
         return json.dumps(self.data)
 
@@ -98,6 +110,8 @@ class QSO:
                 set_output_color("red")
                 print("Leere Eingabe -> QSO nicht verändert.")
 
+        self.normalize_format()
+
     def print_table_header(self):
         print("QSO# ", end='')
         print("Zeit              ", end='')
@@ -128,7 +142,7 @@ class QSOManager:
 
         self.log_file = log_file
 
-        self.qsos = [QSO()]
+        self.qsos = []
 
         if os.path.exists(log_file):
             self.load(log_file)
@@ -157,9 +171,76 @@ class QSOManager:
                 f.write(qso.serialize() + "\n")
 
     def add_qso_from_string(self, text):
-        pass
+        parts = text.split(' ')
+        parts.reverse() # search backwards
+
+        # regular expressions for different parts
+        callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
+        dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
+        rstnumregex = re.compile('[0-9]+', re.IGNORECASE)
+        locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
+
+        callfound = dokfound = rstnumfound = locfound = False
+
+        call = dok = rst = num = loc = None
+
+        for part in parts:
+            part = part.strip()
+
+            if not dokfound:
+                mo = dokregex.match(part)
+                if mo:
+                    dok = mo.group(0)
+                    dokfound = True
+                    continue
+
+            if not rstnumfound:
+                mo = rstnumregex.match(part)
+                if mo:
+                    rstnum = mo.group(0)
+
+                    rst = rstnum[:2]
+                    num = rstnum[2:]
+                    rstnumfound = True
+                    continue
+
+            if not locfound:
+                mo = locregex.match(part)
+                if mo:
+                    loc = mo.group(0)
+                    locfound = True
+                    continue
+
+            if not callfound:
+                locmo = locregex.match(part)
+                if locmo:
+                    set_output_color("yellow")
+                    print(f"ACHTUNG: {part} sieht wie ein Locator aus und wurde als Rufzeichen ignoriert.")
+                else:
+                    mo = callregex.match(part)
+                    if mo:
+                        call = mo.group(0)
+                        callfound = True
+
+        q = QSO(tx_num=str(self.next_number),
+                tx_rst='59', # FIXME
+                rx_call=call,
+                rx_dok=dok,
+                rx_loc=loc,
+                rx_rst=rst,
+                rx_num=num)
+
+        qsoidx = len(self.qsos)
+        self.qsos.append(q)
+
+        return q, qsoidx
 
     def edit_last_qso(self):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
         self.qsos[-1].edit()
 
     def print_qso_table(self):
@@ -210,6 +291,7 @@ class QSOManager:
                         print(f"{nstr} ist keine Zahl")
             elif cmd == 'e':
                 self.edit_last_qso()
+                self.save()
             elif cmd == 'b':
                 nstr = input('QSO-Nummer> ')
                 set_output_color("red")
@@ -220,11 +302,27 @@ class QSOManager:
                     try:
                         qsoidx = int(nstr)
                         self.qsos[qsoidx].edit()
+                        self.save()
                     except Exception as e:
                         print(f"Fehler bei der QSO-Bearbeitung: {str(e)}")
 
             elif cmd == 'l':
                 self.print_qso_table()
+            elif len(cmd) > 1:
+                q, qsoidx = self.add_qso_from_string(cmd)
+                self.save()
+
+                self.next_number += 1
+
+                set_output_color("cyan")
+
+                print("")
+                q.print_table_header()
+                q.print_table_data(qsoidx)
+                print("")
+            else:
+                set_output_color("red")
+                print("Eingabe nicht erkannt.")
 
 
 parser = argparse.ArgumentParser(description='Logprogramm für die Frankenaktivität.')
