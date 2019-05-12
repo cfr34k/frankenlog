@@ -259,7 +259,7 @@ class QSOManager:
 
         while True:
             set_output_color("magenta")
-            print(f"\n<<< 59 {self.next_number:03d} {self.my_loc} {self.my_dok}")
+            print(f"\n<<< 59 {self.next_number:03d} {self.my_dok} {self.my_loc}")
             set_output_color("default")
             cmd = input('> ')
 
