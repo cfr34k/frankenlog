@@ -254,6 +254,41 @@ class QSOManager:
         for i in range(len(self.qsos)):
             self.qsos[i].print_table_data(i)
 
+    def adif_export(self, filename):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
+        with open(filename, 'w') as adifile:
+            # write header
+            adifile.write(f"Generated for {self.my_call} in {self.my_dok} - Loc: {self.my_loc}\n\n")
+            adifile.write(f"<adif_ver:5>3.0.9\n")
+            adifile.write(f"<programid:10>FrankenLog\n")
+            adifile.write(f"<USERDEF2:2:N>Nr\n")
+            adifile.write(f"<EOH>\n\n")
+
+            for q in self.qsos:
+                gmt = time.gmtime(int(q.data['timestamp']))
+
+                d = time.strftime('%Y%m%d', gmt)
+                t = time.strftime('%H%M', gmt)
+
+                call = q.data['rx_call']
+                dok = q.data['rx_dok']
+                loc = q.data['rx_loc']
+                nr = q.data['rx_num']
+
+                adifile.write(f"<QSO_DATE:8>{d}\n")
+                adifile.write(f"<TIME_ON:4>{t}\n")
+                adifile.write(f"<CALL:{len(call)}>{call}\n")
+                adifile.write(f"<RST_SENT:2>{q.data['tx_rst']}\n")
+                adifile.write(f"<RST_RCVD:2>{q.data['rx_rst']}\n")
+                adifile.write(f"<DARC_DOK:{len(dok)}>{dok}\n")
+                adifile.write(f"<GRIDSQUARE:{len(loc)}>{loc}\n")
+                adifile.write(f"<Nr:{len(nr)}>{nr}\n")
+                adifile.write(f"<EOR>\n\n")
+
     def loop(self):
         """Main loop."""
 
@@ -272,6 +307,7 @@ class QSOManager:
                 print("e - Das letzte QSO bearbeiten")
                 print("b - QSO nach Nummer bearbeiten")
                 print("l - QSOs auflisten")
+                print("a - ADIF-Datei exportieren")
                 print("")
                 print("Jede andere Eingabe wird als neues QSO interpretiert und eingelesen")
                 print("")
@@ -308,6 +344,11 @@ class QSOManager:
 
             elif cmd == 'l':
                 self.print_qso_table()
+            elif cmd == 'a':
+                filename = self.log_file + ".adi"
+                self.adif_export(filename)
+                set_output_color("green")
+                print(f"Exported to: {filename}")
             elif len(cmd) > 1:
                 q, qsoidx = self.add_qso_from_string(cmd)
                 self.save()
