@@ -5,6 +5,15 @@ import re
 import argparse
 import time
 import json
+import readline
+
+import helper
+
+# regular expressions for different parts of a QSO
+callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
+dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
+rstnumregex = re.compile('[0-9]+', re.IGNORECASE)
+locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
 
 def set_output_color(color, bold=False):
     colormap = {
@@ -38,7 +47,7 @@ class QSO:
             'rx_dok': "Empfangener DOK"
         }
 
-    def __init__(self, **kwargs):
+    def __init__(self, my_info, **kwargs):
         self.data = {}
 
         self.data['timestamp'] = str(int(time.time()))
@@ -54,7 +63,11 @@ class QSO:
 
         self.data.update(kwargs)
 
+        self.my_info = my_info
+
         self.normalize_format()
+
+        self.update_stats()
 
     def normalize_format(self):
         if self.data['tx_num']:
@@ -71,6 +84,7 @@ class QSO:
 
     def deserialize(self, string):
         self.data = json.loads(string)
+        self.update_stats()
 
     def edit(self):
         cmd = 'x'
@@ -111,17 +125,34 @@ class QSO:
                 print("Leere Eingabe -> QSO nicht verändert.")
 
         self.normalize_format()
+        self.update_stats()
 
-    def print_table_header(self):
+    def update_stats(self):
+        tx_loc = self.my_info['loc']
+        rx_loc = self.data['rx_loc']
+
+        if not tx_loc or not rx_loc:
+            self.stats = None
+            return
+
+        self.stats = {}
+        self.stats['distance'] = helper.DistanceBetweenLocs(tx_loc, rx_loc)
+        self.stats['dok']    = self.data['rx_dok']
+        self.stats['field']  = rx_loc[:4]
+
+    def print_table_header(self, term=True):
         print("QSO# ", end='')
         print("Zeit              ", end='')
         print("TX RST/Nr.   ", end='')
         print("RX Rufz.     ", end='')
         print("RX RST/Nr.   ", end='')
         print("RX DOK  ", end='')
-        print("RX Loc. ")
+        print("RX Loc. ", end='')
+        print("Distanz ", end='')
+        if term:
+            print()
 
-    def print_table_data(self, idx):
+    def print_table_data(self, idx, term=True):
         gmt = time.gmtime(int(self.data['timestamp']))
         timestr = time.strftime('%Y-%m-%d %H:%M', gmt)
 
@@ -131,14 +162,22 @@ class QSO:
         print("{:13s}".format(self.data['rx_call'] or '-'), end='')
         print("{} {:10s}".format(self.data['rx_rst'], self.data['rx_num'] or '-'), end='')
         print("{:8s}".format(self.data['rx_dok'] or '-'), end='')
-        print("{:8s}".format(self.data['rx_loc'] or '-'))
+        print("{:8s}".format(self.data['rx_loc'] or '-'), end='')
+        if self.stats:
+            print("{:7.1f} ".format(self.stats['distance']), end='')
+        else:
+            print("{:>7s} ".format('-'), end='')
+        if term:
+            print()
 
 
 class QSOManager:
-    def __init__(self, my_call, my_loc, my_dok, log_file):
-        self.my_call = my_call
-        self.my_loc = my_loc
-        self.my_dok = my_dok
+    def __init__(self, my_info, log_file):
+        self.my_info = {
+                'call': my_info['call'],
+                'loc': my_info['loc'],
+                'dok': my_info['dok']
+            }
 
         self.log_file = log_file
 
@@ -155,7 +194,7 @@ class QSOManager:
     def load(self, log_file):
         with open(log_file, 'r') as f:
             for line in f:
-                q = QSO()
+                q = QSO(self.my_info)
                 q.deserialize(line)
                 self.qsos.append(q)
 
@@ -173,12 +212,6 @@ class QSOManager:
     def add_qso_from_string(self, text):
         parts = text.split(' ')
         parts.reverse() # search backwards
-
-        # regular expressions for different parts
-        callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
-        dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
-        rstnumregex = re.compile('[0-9]+', re.IGNORECASE)
-        locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
 
         callfound = dokfound = rstnumfound = locfound = False
 
@@ -222,7 +255,8 @@ class QSOManager:
                         call = mo.group(0)
                         callfound = True
 
-        q = QSO(tx_num=str(self.next_number),
+        q = QSO(self.my_info,
+                tx_num=str(self.next_number),
                 tx_rst='59', # FIXME
                 rx_call=call,
                 rx_dok=dok,
@@ -254,6 +288,53 @@ class QSOManager:
         for i in range(len(self.qsos)):
             self.qsos[i].print_table_data(i)
 
+    def print_evaluation(self):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
+        total_points = 0
+        multi = 0
+
+        seen_doks = set()
+        seen_fields = set()
+
+        self.qsos[0].print_table_header(term=False)
+        print("Punkte ", end='')
+        print("DOK-Multi ", end='')
+        print("Loc-Multi ", end='')
+        print()
+
+        for i in range(len(self.qsos)):
+            q = self.qsos[i]
+
+            points = 0
+            if self.my_info['dok'] != q.data['rx_dok']:
+                points = round(q.stats['distance'])
+
+            total_points += points
+
+            dok_multi = q.stats['dok'] not in seen_doks and helper.DOKCountsAsMulti(q.stats['dok'])
+            field_multi = q.stats['field'] not in seen_fields
+
+            if dok_multi:
+                seen_doks.add(q.stats['dok'])
+                multi += 1
+
+            if field_multi:
+                seen_fields.add(q.stats['field'])
+                multi += 1
+
+            self.qsos[i].print_table_data(i, term=False)
+            print(f"{points:6d} ", end='')
+            print(f"{dok_multi:9} ", end='')
+            print(f"{field_multi:9} ", end='')
+            print()
+
+        score = multi * total_points
+        print(f"\nGesamtpunktzahl = Multi × Punkte = {multi} × {total_points} = {score}\n")
+
     def adif_export(self, filename):
         if not self.qsos:
             set_output_color("yellow")
@@ -262,7 +343,7 @@ class QSOManager:
 
         with open(filename, 'w') as adifile:
             # write header
-            adifile.write(f"Generated for {self.my_call} in {self.my_dok} - Loc: {self.my_loc}\n\n")
+            adifile.write(f"Generated for {self.my_info['call']} in {self.my_info['dok']} - Loc: {self.my_info['loc']}\n\n")
             adifile.write(f"<adif_ver:5>3.0.9\n")
             adifile.write(f"<programid:10>FrankenLog\n")
             adifile.write(f"<USERDEF2:2:N>Nr\n")
@@ -294,7 +375,7 @@ class QSOManager:
 
         while True:
             set_output_color("magenta")
-            print(f"\n<<< 59 {self.next_number:03d} {self.my_dok} {self.my_loc}")
+            print(f"\n<<< 59 {self.next_number:03d} {self.my_info['dok']} {self.my_info['loc']}")
             set_output_color("default")
             cmd = input('> ')
 
@@ -307,7 +388,9 @@ class QSOManager:
                 print("e - Das letzte QSO bearbeiten")
                 print("b - QSO nach Nummer bearbeiten")
                 print("l - QSOs auflisten")
+                print("w - Auswertung anzeigen")
                 print("a - ADIF-Datei exportieren")
+                print("t - TXT-Datei exportieren")
                 print("")
                 print("Jede andere Eingabe wird als neues QSO interpretiert und eingelesen")
                 print("")
@@ -344,6 +427,8 @@ class QSOManager:
 
             elif cmd == 'l':
                 self.print_qso_table()
+            elif cmd == 'w':
+                self.print_evaluation()
             elif cmd == 'a':
                 filename = self.log_file + ".adi"
                 self.adif_export(filename)
@@ -367,30 +452,66 @@ class QSOManager:
 
 
 parser = argparse.ArgumentParser(description='Logprogramm für die Frankenaktivität.')
-parser.add_argument('-c', '--call', dest='call', type=str, required=True, help='Eigenes Rufzeichen')
-parser.add_argument('-l', '--locator', dest='locator', type=str, required=True, help='Eigener Locator')
-parser.add_argument('-d', '--dok', dest='dok', type=str, required=True, help='Eigener DOK')
-parser.add_argument('-o', '--output-file', dest='output_file', type=str, required=True, help='File where the QSOs will be saved. Will be loaded if it exists.')
+parser.add_argument('-o', '--output-file', dest='output_file', type=str, required=True, help='In dieser Datei werden die QSOs gespeichert. Wird beim Start eingelesen.')
+parser.add_argument('-i', '--info-file', dest='info_file', type=str, required=True, help='Datei mit Benutzerinformationen. Wird angelegt, wenn sie nicht existiert. Fehlende Infos werden abgefragt.')
 
 args = parser.parse_args()
 
-my_call = args.call
-my_loc  = args.locator
-my_dok  = args.dok
+my_info = {}
+
+try:
+    with open(args.info_file, 'r') as info_file:
+        my_info = json.load(info_file)
+except FileNotFoundError:
+    pass
+except Exception as e:
+    set_output_color("red")
+    print(f"Kann Benutzerinfo nicht aus '{args.info_file}' laden: {str(e)}. Ende.")
+    exit(1)
+
+while not my_info.get('call'):
+    set_output_color("yellow")
+    print("Rufzeichen nicht gesetzt!")
+    set_output_color("default")
+    my_info['call'] = input("Gib dein Rufzeichen ein: ")
+
+while not my_info.get('loc'):
+    set_output_color("yellow")
+    print("Locator nicht gesetzt!")
+    set_output_color("default")
+    loc = input("Gib deinen Locator ein: ")
+    if not locregex.match(loc):
+        set_output_color("red")
+        print("Das ist kein gültiger Locator!")
+    else:
+        my_info['loc'] = loc.upper()
+
+while not my_info.get('dok'):
+    set_output_color("yellow")
+    print("DOK nicht gesetzt!")
+    set_output_color("default")
+    my_info['dok'] = input("Gib deinen DOK ein: ")
+
+with open(args.info_file, 'w') as info_file:
+    try:
+        json.dump(my_info, info_file)
+    except Exception as e:
+        set_output_color("yellow")
+        print(f"Kann Benutzerinfo nicht in '{args.info_file}' speichern: {str(e)}.")
 
 set_output_color("green")
 print(f"""
 Eigene Info:
 
-    Rufzeichen: {my_call}
-    Locator:    {my_loc}
-    DOK:        {my_dok}
+    Rufzeichen: {my_info['call']}
+    Locator:    {my_info['loc']}
+    DOK:        {my_info['dok']}
 
 Gib 'h' für eine Befehlsliste ein.
 """)
 
 set_output_color("default")
 
-qsomgr = QSOManager(args.call, args.locator, args.dok, args.output_file)
+qsomgr = QSOManager(my_info, args.output_file)
 
 qsomgr.loop()
