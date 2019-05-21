@@ -36,3 +36,24 @@ if __name__ == "__main__":
 
 def DOKCountsAsMulti(dok):
     return dok in DOK_LIST
+
+def set_output_color(color, bold=False):
+    colormap = {
+            "black": "30",
+            "red": "31",
+            "green": "32",
+            "yellow": "33",
+            "blue": "34",
+            "magenta": "35",
+            "cyan": "36",
+            "white": "37"
+        }
+
+    if color == "default":
+        print("\033[0m", end='')
+    else:
+        bstr = "1" if bold else "0"
+        cstr = colormap[color]
+        print(f"\033[{bstr};{cstr}m", end='')
+
+

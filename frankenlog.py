@@ -8,32 +8,15 @@ import json
 import readline
 
 import helper
+from helper import set_output_color
+
+from templates import *
 
 # regular expressions for different parts of a QSO
 callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
 dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
 rstnumregex = re.compile('[0-9]+', re.IGNORECASE)
 locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
-
-def set_output_color(color, bold=False):
-    colormap = {
-            "black": "30",
-            "red": "31",
-            "green": "32",
-            "yellow": "33",
-            "blue": "34",
-            "magenta": "35",
-            "cyan": "36",
-            "white": "37"
-        }
-
-    if color == "default":
-        print("\033[0m", end='')
-    else:
-        bstr = "1" if bold else "0"
-        cstr = colormap[color]
-        print(f"\033[{bstr};{cstr}m", end='')
-
 
 class QSO:
     NAME_MAP = {
@@ -173,11 +156,7 @@ class QSO:
 
 class QSOManager:
     def __init__(self, my_info, log_file):
-        self.my_info = {
-                'call': my_info['call'],
-                'loc': my_info['loc'],
-                'dok': my_info['dok']
-            }
+        self.my_info = my_info
 
         self.log_file = log_file
 
@@ -370,6 +349,92 @@ class QSOManager:
                 adifile.write(f"<Nr:{len(nr)}>{nr}\n")
                 adifile.write(f"<EOR>\n\n")
 
+    def txt_export(self, filename):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
+        # gather information
+        template_info = {}
+        template_info['my_call'] = self.my_info['call']
+        template_info['my_loc'] = self.my_info['loc']
+        template_info['my_dok'] = self.my_info['dok']
+        template_info['qth'] = self.my_info['qth']
+        template_info['addr'] = self.my_info['addr']
+        template_info['name'] = self.my_info['name']
+        template_info['nqsos'] = len(self.qsos)
+        template_info['today_de'] = time.strftime('%d.%m.%Y')
+
+        # TODO: ask for additional information
+        template_info['compo'] = 'C - 2m (alle Betriebsarten)'
+        template_info['band'] = '2 m'
+
+        total_points = 0
+        dok_multi = 0
+        field_multi = 0
+
+        seen_doks = set()
+        seen_fields = set()
+
+        template_info['qsotable'] = ""
+
+        for i, q in enumerate(self.qsos):
+            q = self.qsos[i]
+
+            points = 0
+            if self.my_info['dok'] != q.data['rx_dok']:
+                points = round(q.stats['distance'])
+
+            total_points += points
+
+            is_dok_multi = q.stats['dok'] not in seen_doks and helper.DOKCountsAsMulti(q.stats['dok'])
+            is_field_multi = q.stats['field'] not in seen_fields
+
+            if is_dok_multi:
+                seen_doks.add(q.stats['dok'])
+                dok_multi += 1
+
+            if is_field_multi:
+                seen_fields.add(q.stats['field'])
+                field_multi += 1
+
+            sent = TXT_SENT_TEMPLATE.format(
+                    tx_dok = self.my_info['dok'],
+                    tx_loc = self.my_info['loc'],
+                    tx_rst = q.data['tx_rst'],
+                    tx_num = q.data['tx_num'],
+                )
+            rcvd = TXT_RCVD_TEMPLATE.format(**(q.data))
+
+            gmt = time.gmtime(int(q.data['timestamp']))
+
+            template_info['qsotable'] += TXT_QSO_TEMPLATE.format(
+                        nr = i + 1,
+                        date = time.strftime('%d%m%y', gmt),
+                        utc = time.strftime('%H%M', gmt),
+                        call = q.data['rx_call'],
+                        band = '?',
+                        mode = 'SSB', # FIXME
+                        sent = sent,
+                        rcvd = rcvd,
+                        new_dok = q.stats['dok'] if is_dok_multi else '',
+                        new_loc = q.stats['field'] if is_field_multi else '',
+                        points = points
+                    ) + "\n"
+
+        multi = dok_multi + field_multi
+        score = multi * total_points
+
+        template_info['dok_multi'] = dok_multi
+        template_info['field_multi'] = field_multi
+        template_info['total_multi'] = multi
+        template_info['total_points'] = total_points
+        template_info['final_score'] = score
+
+        with open(filename, 'w') as txtfile:
+            txtfile.write(TXT_TEMPLATE.format(**template_info))
+
     def loop(self):
         """Main loop."""
 
@@ -434,6 +499,11 @@ class QSOManager:
                 self.adif_export(filename)
                 set_output_color("green")
                 print(f"Exported to: {filename}")
+            elif cmd == 't':
+                filename = self.log_file + ".txt"
+                self.txt_export(filename)
+                set_output_color("green")
+                print(f"Exported to: {filename}")
             elif len(cmd) > 1:
                 q, qsoidx = self.add_qso_from_string(cmd)
                 self.save()
@@ -450,6 +520,50 @@ class QSOManager:
                 set_output_color("red")
                 print("Eingabe nicht erkannt.")
 
+def get_user_info(info_file_name):
+    keys = ['call', 'loc', 'dok', 'name', 'addr', 'qth']
+    names = ['Rufzeichen', 'Locator', 'DOK', 'Name', 'Straße und Hausnummer', 'PLZ/Ort']
+    query_tpl = ['dein {}', 'deinen {}', 'deinen {}', 'deinen {}n', 'deine {}', 'deine PLZ/deinen Ort']
+    check_regex = [None, locregex, None, None, None, None]
+
+    my_info = {}
+
+    try:
+        with open(info_file_name, 'r') as info_file:
+            my_info = json.load(info_file)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        set_output_color("red")
+        print(f"Kann Benutzerinfo nicht aus '{args.info_file}' laden: {str(e)}. Ende.")
+        exit(1)
+
+    for idx, k in enumerate(keys):
+        while not my_info.get(k):
+            set_output_color("yellow")
+            print(f"{names[idx]} nicht gesetzt!")
+            set_output_color("default")
+            inp = input("Gib {} ein: ".format(query_tpl[idx].format(names[idx])))
+
+            if k in ['call', 'loc', 'dok']:
+                inp = inp.upper()
+
+            if check_regex[idx]:
+                if not check_regex[idx].match(inp):
+                    set_output_color("red")
+                    print(f"Ungültige Eingabe!")
+                    continue
+
+            my_info[k] = inp
+
+    with open(info_file_name, 'w') as info_file:
+        try:
+            json.dump(my_info, info_file)
+        except Exception as e:
+            set_output_color("yellow")
+            print(f"Kann Benutzerinfo nicht in '{args.info_file}' speichern: {str(e)}.")
+
+    return my_info
 
 parser = argparse.ArgumentParser(description='Logprogramm für die Frankenaktivität.')
 parser.add_argument('-o', '--output-file', dest='output_file', type=str, required=True, help='In dieser Datei werden die QSOs gespeichert. Wird beim Start eingelesen.')
@@ -457,47 +571,7 @@ parser.add_argument('-i', '--info-file', dest='info_file', type=str, required=Tr
 
 args = parser.parse_args()
 
-my_info = {}
-
-try:
-    with open(args.info_file, 'r') as info_file:
-        my_info = json.load(info_file)
-except FileNotFoundError:
-    pass
-except Exception as e:
-    set_output_color("red")
-    print(f"Kann Benutzerinfo nicht aus '{args.info_file}' laden: {str(e)}. Ende.")
-    exit(1)
-
-while not my_info.get('call'):
-    set_output_color("yellow")
-    print("Rufzeichen nicht gesetzt!")
-    set_output_color("default")
-    my_info['call'] = input("Gib dein Rufzeichen ein: ")
-
-while not my_info.get('loc'):
-    set_output_color("yellow")
-    print("Locator nicht gesetzt!")
-    set_output_color("default")
-    loc = input("Gib deinen Locator ein: ")
-    if not locregex.match(loc):
-        set_output_color("red")
-        print("Das ist kein gültiger Locator!")
-    else:
-        my_info['loc'] = loc.upper()
-
-while not my_info.get('dok'):
-    set_output_color("yellow")
-    print("DOK nicht gesetzt!")
-    set_output_color("default")
-    my_info['dok'] = input("Gib deinen DOK ein: ")
-
-with open(args.info_file, 'w') as info_file:
-    try:
-        json.dump(my_info, info_file)
-    except Exception as e:
-        set_output_color("yellow")
-        print(f"Kann Benutzerinfo nicht in '{args.info_file}' speichern: {str(e)}.")
+my_info = get_user_info(args.info_file)
 
 set_output_color("green")
 print(f"""
