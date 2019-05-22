@@ -1,6 +1,7 @@
 # FrankenLog
 
-Ein Logprogramm für den Aktivitätswettbewerb Franken (oder andere Conteste, wo laufende Nummern und DOKs ausgetauscht werden).
+Ein Logprogramm für den Aktivitätswettbewerb Franken (oder andere Conteste, wo
+laufende Nummern und DOKs ausgetauscht werden).
 
 ## Motivation
 
@@ -39,7 +40,13 @@ QSO# Zeit              TX RST/Nr.   RX Rufz.     RX RST/Nr.   RX DOK  RX Loc.
   - Locator
 - Kurzbefehl (e) zur Korrektur des letzten QSOs
 - Nachträgliche Korrektur beliebiger QSOs (b)
+- Auswertung mit Punktzahl- und Multiplikator-Berechnung
 - ADIF-Export (kann im HamFranken eingelesen werden)
+- TXT-Export (entspricht der "eLog-Gesamtdatei" von HamFranken)
 
 Bei der Korrektur gibt es keine Einschränkungen durch die Mustererkennung. Das
 ist nützlich, wenn z.B. ein Sonder-DOK nicht automatisch erkannt wurde.
+
+## Lizenz
+
+Dieses Programm ist freie Software unter der GPL v3 (siehe LICENSE).
