@@ -161,6 +161,7 @@ class QSOManager:
         self.log_file = log_file
 
         self.qsos = []
+        self.compo = None
 
         if os.path.exists(log_file):
             self.load(log_file)
@@ -172,7 +173,18 @@ class QSOManager:
 
     def load(self, log_file):
         with open(log_file, 'r') as f:
+            firstLine = True
             for line in f:
+                if firstLine:
+                    firstLine = False
+
+                    obj = json.loads(line)
+                    if 'class' in obj:
+                        self.compo = obj['class']
+                        continue # successfully parsed, so this line is not a QSO
+                    else:
+                        self.compo = None
+
                 q = QSO(self.my_info)
                 q.deserialize(line)
                 self.qsos.append(q)
@@ -185,6 +197,9 @@ class QSOManager:
             os.rename(log_file, log_file + "~")
 
         with open(log_file, 'w') as f:
+            meta = {'class': self.compo}
+            f.write(json.dumps(meta) + "\n")
+
             for qso in self.qsos:
                 f.write(qso.serialize() + "\n")
 
@@ -305,14 +320,23 @@ class QSOManager:
                 seen_fields.add(q.stats['field'])
                 multi += 1
 
+            if points > 1000:
+                set_output_color("red")
+            elif points > 300:
+                set_output_color("yellow")
+
             self.qsos[i].print_table_data(i, term=False)
             print(f"{points:6d} ", end='')
             print(f"{dok_multi:9} ", end='')
             print(f"{field_multi:9} ", end='')
             print()
 
+            set_output_color("default")
+
         score = multi * total_points
         print(f"\nGesamtpunktzahl = Multi × Punkte = {multi} × {total_points} = {score}\n")
+
+        print("QSOs \033[0;33m>300km\033[0m oder \033[0;31m>1000km\033[0m sollten besonders auf Fehler geprüft werden!\n")
 
     def adif_export(self, filename):
         if not self.qsos:
@@ -366,9 +390,21 @@ class QSOManager:
         template_info['nqsos'] = len(self.qsos)
         template_info['today_de'] = time.strftime('%d.%m.%Y')
 
-        # TODO: ask for additional information
-        template_info['compo'] = 'C - 2m (alle Betriebsarten)'
-        template_info['band'] = '2 m'
+        # choose strings based on selected competition class
+        if self.compo == 'C':
+            template_info['compo'] = 'C - 2m (alle Betriebsarten)'
+            template_info['band'] = '2 m'
+            band = '2'
+        elif self.compo == 'D':
+            template_info['compo'] = 'D - 70cm (alle Betriebsarten)'
+            template_info['band'] = '70 cm'
+            band = '70'
+        else:
+            template_info['compo'] = 'INVALID'
+            template_info['band'] = 'INVALID'
+            band = '???'
+
+        mode = 'SSB' # FIXME?
 
         total_points = 0
         dok_multi = 0
@@ -414,8 +450,8 @@ class QSOManager:
                         date = time.strftime('%d%m%y', gmt),
                         utc = time.strftime('%H%M', gmt),
                         call = q.data['rx_call'],
-                        band = '?',
-                        mode = 'SSB', # FIXME
+                        band = band,
+                        mode = mode,
                         sent = sent,
                         rcvd = rcvd,
                         new_dok = q.stats['dok'] if is_dok_multi else '',
@@ -500,6 +536,17 @@ class QSOManager:
                 set_output_color("green")
                 print(f"Exported to: {filename}")
             elif cmd == 't':
+                while not self.compo:
+                    set_output_color("yellow")
+                    print("Teilnahmeklasse nicht gesetzt!")
+                    set_output_color("default")
+                    compo = input("Wähle die Klasse aus (C = 2m, D = 70cm): ").upper()
+                    if compo not in ['C', 'D']:
+                        print("Eingabe nicht erkannt. Nur 1 Buchstabe darf eingegeben werden")
+                        continue
+                    else:
+                        self.compo = compo
+
                 filename = self.log_file + ".txt"
                 self.txt_export(filename)
                 set_output_color("green")
