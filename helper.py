@@ -46,11 +46,6 @@ def DistanceBetweenLocs(loc1, loc2):
 
     return (m.acos(cse) * 180 / m.pi) * 111.1
 
-
-if __name__ == "__main__":
-    print(DistanceBetweenLocs("JN58QR", "JN59MO"))
-    print(DistanceBetweenLocs("JN59NS", "JN59MO"))
-
 def DOKCountsAsMulti(dok):
     return dok in DOK_LIST
 
@@ -73,4 +68,10 @@ def set_output_color(color, bold=False):
         cstr = colormap[color]
         print(f"\033[{bstr};{cstr}m", end='')
 
+
+### Test code
+
+if __name__ == "__main__":
+    print(DistanceBetweenLocs("JN58QR", "JN59MO"))
+    print(DistanceBetweenLocs("JN59NS", "JN59MO"))
 
