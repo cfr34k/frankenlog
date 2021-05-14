@@ -68,6 +68,7 @@ class QSO:
 
         self.update_stats()
 
+
     def normalize_format(self):
         if self.data['tx_num']:
             self.data['tx_num'] = "{:03d}".format(int(self.data['tx_num']))
@@ -354,6 +355,18 @@ class QSOManager:
 
         print("QSOs \033[0;33m>300km\033[0m oder \033[0;31m>1000km\033[0m sollten besonders auf Fehler geprüft werden!\n")
 
+    def check_compo(self):
+        while not self.compo:
+            set_output_color("yellow")
+            print("Teilnahmeklasse nicht gesetzt!")
+            set_output_color("default")
+            compo = input("Wähle die Klasse aus (C = 2m, D = 70cm): ").upper()
+            if compo not in ['C', 'D']:
+                print("Eingabe nicht erkannt. Nur 1 Buchstabe darf eingegeben werden")
+                continue
+            else:
+                self.compo = compo
+
     def adif_export(self, filename):
         if not self.qsos:
             set_output_color("yellow")
@@ -487,6 +500,70 @@ class QSOManager:
         with open(filename, 'w') as txtfile:
             txtfile.write(TXT_TEMPLATE.format(**template_info))
 
+    def cabrillo_export(self, filename):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
+        with open(filename, 'w') as cabrillofile:
+            freq = {'C': 144, 'D': 432}[self.compo]
+            band = {'C': '2M', 'D': '432'}[self.compo]
+
+            mycall = self.my_info['call']
+            mydok  = self.my_info['dok']
+            myloc  = self.my_info['loc']
+
+            mo = "PH" # FIXME?
+            mode = "SSB" # FIXME?
+
+            # Cabrillo header
+            cabrillofile.write(f"START-OF-LOG: 3.0\n")
+
+            cabrillofile.write(f"CREATED-BY: Frankenlog v0.2\n")
+            cabrillofile.write(f"CALLSIGN: {mycall}\n")
+            cabrillofile.write(f"CATEGORY-BAND: {band}\n")
+            cabrillofile.write(f"CATEGORY-MODE: {mode}\n")
+            cabrillofile.write(f"GRID-LOCATOR: {myloc}\n")
+            cabrillofile.write(f"NAME: {self.my_info['name']}\n")
+            cabrillofile.write(f"ADDRESS: {self.my_info['addr']}\n")
+            cabrillofile.write(f"ADDRESS: {self.my_info['qth']}\n")
+
+            # QSO header for double-check
+            cabrillofile.write("QSO: freq  mo datetime        call          rst nr  dok    loc    call          rst nr  dok    loc\n")
+            cabrillofile.write("QSO: ***** ** yyyy-mm-dd nnnn ************* nnn nnn ****** ****** ************* nnn nnn ****** ******\n")
+
+            for q in self.qsos:
+                gmt = time.gmtime(int(q.data['timestamp']))
+
+                datetime = time.strftime('%Y-%m-%d %H%M', gmt)
+
+                tx_rst = q.data['tx_rst']
+                rx_rst = q.data['rx_rst']
+                call = q.data['rx_call']
+                dok = q.data['rx_dok']
+                loc = q.data['rx_loc']
+                rx_nr = q.data['rx_num']
+                tx_nr = q.data['tx_num']
+
+                cabrillofile.write("QSO: ")
+                cabrillofile.write(f"{freq:5d} ")
+                cabrillofile.write(f"{mo} ")
+                cabrillofile.write(f"{datetime} ")
+                cabrillofile.write(f"{mycall:13s} ")
+                cabrillofile.write(f"{tx_rst:3s} ")
+                cabrillofile.write(f"{tx_nr:3s} ")
+                cabrillofile.write(f"{mydok:6s} ")
+                cabrillofile.write(f"{myloc:6s} ")
+                cabrillofile.write(f"{call:13s} ")
+                cabrillofile.write(f"{rx_rst:3s} ")
+                cabrillofile.write(f"{rx_nr:3s} ")
+                cabrillofile.write(f"{dok:6s} ")
+                cabrillofile.write(f"{loc:6s}\n")
+
+            # Cabrillo footer
+            cabrillofile.write(f"END-OF-LOG\n")
+
     def loop(self):
         """Main loop."""
 
@@ -507,6 +584,7 @@ class QSOManager:
                 print("l - QSOs auflisten")
                 print("w - Auswertung anzeigen")
                 print("a - ADIF-Datei exportieren")
+                print("c - Cabrillo-Datei exportieren")
                 print("t - TXT-Datei exportieren")
                 print("")
                 print("Jede andere Eingabe wird als neues QSO interpretiert und eingelesen")
@@ -551,17 +629,15 @@ class QSOManager:
                 self.adif_export(filename)
                 set_output_color("green")
                 print(f"Exported to: {filename}")
+            elif cmd == 'c':
+                self.check_compo()
+
+                filename = self.log_file + ".cabrillo"
+                self.cabrillo_export(filename)
+                set_output_color("green")
+                print(f"Exported to: {filename}")
             elif cmd == 't':
-                while not self.compo:
-                    set_output_color("yellow")
-                    print("Teilnahmeklasse nicht gesetzt!")
-                    set_output_color("default")
-                    compo = input("Wähle die Klasse aus (C = 2m, D = 70cm): ").upper()
-                    if compo not in ['C', 'D']:
-                        print("Eingabe nicht erkannt. Nur 1 Buchstabe darf eingegeben werden")
-                        continue
-                    else:
-                        self.compo = compo
+                self.check_compo()
 
                 filename = self.log_file + ".txt"
                 self.txt_export(filename)
