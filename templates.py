@@ -48,7 +48,7 @@ TXT_TEMPLATE = """\
      Ort: {qth}     Datum: {today_de}   Call: {my_call}
       
       
-     Dieses ContestLog wurde mit Frankenlog v0.1 erstellt. (https://github.com/cfr34k/frankenlog)
+     Dieses ContestLog wurde mit Frankenlog v0.2 erstellt. (https://github.com/cfr34k/frankenlog)
       
       
       
