@@ -146,7 +146,6 @@ class QSO:
         print("TX RST/Nr.   ", end='')
         print("RX Rufz.     ", end='')
         print("RX RST/Nr.   ", end='')
-        print("RX DOK  ", end='')
         print("RX Loc. ", end='')
         print("Distanz ", end='')
         if term:
@@ -161,7 +160,6 @@ class QSO:
         print("{} {:10s}".format(self.data['tx_rst'], self.data['tx_num'] or '-'), end='')
         print("{:13s}".format(self.data['rx_call'] or '-'), end='')
         print("{} {:10s}".format(self.data['rx_rst'], self.data['rx_num'] or '-'), end='')
-        print("{:8s}".format(self.data['rx_dok'] or '-'), end='')
         print("{:8s}".format(self.data['rx_loc'] or '-'), end='')
         if self.stats:
             print("{:7.1f} ".format(self.stats['distance']), end='')
@@ -306,36 +304,17 @@ class QSOManager:
             return
 
         total_points = 0
-        multi = 0
-
-        seen_doks = set()
-        seen_fields = set()
 
         self.qsos[0].print_table_header(term=False)
         print("Punkte ", end='')
-        print("DOK-Multi ", end='')
-        print("Loc-Multi ", end='')
         print()
 
         for i in range(len(self.qsos)):
             q = self.qsos[i]
 
             points = 0
-            if self.my_info['dok'] != q.data['rx_dok']:
-                points = round(q.stats['distance'])
-
+            points = round(q.stats['distance'])
             total_points += points
-
-            dok_multi = q.stats['dok'] not in seen_doks and helper.DOKCountsAsMulti(q.stats['dok'])
-            field_multi = q.stats['field'] not in seen_fields
-
-            if dok_multi:
-                seen_doks.add(q.stats['dok'])
-                multi += 1
-
-            if field_multi:
-                seen_fields.add(q.stats['field'])
-                multi += 1
 
             if points > 1000:
                 set_output_color("red")
@@ -344,14 +323,11 @@ class QSOManager:
 
             self.qsos[i].print_table_data(i, term=False)
             print(f"{points:6d} ", end='')
-            print(f"{dok_multi:9} ", end='')
-            print(f"{field_multi:9} ", end='')
             print()
 
             set_output_color("default")
 
-        score = multi * total_points
-        print(f"\nGesamtpunktzahl = Multi × Punkte = {multi} × {total_points} = {score}\n")
+        print(f"\nGesamtpunktzahl = {total_points}\n")
 
         print("QSOs \033[0;33m>300km\033[0m oder \033[0;31m>1000km\033[0m sollten besonders auf Fehler geprüft werden!\n")
 
@@ -569,7 +545,7 @@ class QSOManager:
 
         while True:
             set_output_color("magenta")
-            print(f"\n<<< 59 {self.next_number:03d} {self.my_info['dok']} {self.my_info['loc']}")
+            print(f"\n<<< 59 {self.next_number:03d} {self.my_info['loc']}")
             set_output_color("default")
             cmd = input('> ')
 
