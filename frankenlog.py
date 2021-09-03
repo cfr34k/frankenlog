@@ -540,6 +540,91 @@ class QSOManager:
             # Cabrillo footer
             cabrillofile.write(f"END-OF-LOG\n")
 
+    def edi_export(self, filename):
+        if not self.qsos:
+            set_output_color("yellow")
+            print("Keine QSOs im Log.")
+            return
+
+        with open(filename, 'w') as edifile:
+            freq = {'C': 144, 'D': 435}[self.compo]
+            band = {'C': '145 MHz', 'D': '435 MHz'}[self.compo]
+
+            mycall = self.my_info['call']
+            mydok  = self.my_info['dok']
+            myloc  = self.my_info['loc']
+
+            mo = "PH" # FIXME?
+            mode = "SSB" # FIXME?
+
+            total_score = 0
+            for q in self.qsos:
+                total_score += round(q.stats['distance'])
+
+            # EDI header
+            edifile.write(f"[REG1TEST;1]\n")
+
+            edifile.write(f"PCall={mycall}\n")
+            edifile.write(f"PBand={band}\n")
+            #edifile.write(f"CATEGORY-MODE: {mode}\n")
+            edifile.write(f"PWWLo={myloc}\n")
+            edifile.write(f"RName={self.my_info['name']}\n")
+            edifile.write(f"PAdr1={self.my_info['addr']}\n")
+            edifile.write(f"PAdr2={self.my_info['qth']}\n")
+
+            edifile.write(f"CQSOs={len(self.qsos)}\n")
+            edifile.write(f"CQSOP={total_score}\n")
+
+            # QSO header for double-check
+            edifile.write(f"[QSORecords:{len(self.qsos)}]\n")
+
+            seen_locs = set()
+            seen_calls = set()
+
+            for q in self.qsos:
+                gmt = time.gmtime(int(q.data['timestamp']))
+
+                dt = time.strftime('%Y%m%d', gmt)
+                tm = time.strftime('%H%M', gmt)
+
+                tx_rst = q.data['tx_rst']
+                rx_rst = q.data['rx_rst']
+                call = q.data['rx_call']
+                dok = q.data['rx_dok']
+                loc = q.data['rx_loc']
+                rx_nr = q.data['rx_num']
+                tx_nr = q.data['tx_num']
+
+                points = round(q.stats['distance'])
+
+                if loc in seen_locs:
+                    new_wwl = ''
+                else:
+                    new_wwl = 'Y'
+                    seen_locs.add(loc)
+
+                if call in seen_calls:
+                    duplicate = 'D'
+                else:
+                    duplicate = ''
+                    seen_calls.add(call)
+
+                edifile.write(f"{dt};")
+                edifile.write(f"{tm};")
+                edifile.write(f"{call};")
+                edifile.write(f"1;")            # SSB
+                edifile.write(f"{tx_rst};")
+                edifile.write(f"{tx_nr};")
+                edifile.write(f"{rx_rst};")
+                edifile.write(f"{rx_nr};")
+                edifile.write(f";")             # received exchange: empty
+                edifile.write(f"{loc};")
+                edifile.write(f"{points};")
+                edifile.write(f";")             # new exchange: not relevant
+                edifile.write(f"{new_wwl};")
+                edifile.write(f";")             # new dxcc: not relevant
+                edifile.write(f"{duplicate}\n")
+
     def loop(self):
         """Main loop."""
 
@@ -562,6 +647,7 @@ class QSOManager:
                 print("a - ADIF-Datei exportieren")
                 print("c - Cabrillo-Datei exportieren")
                 print("t - TXT-Datei exportieren")
+                print("i - EDI-Datei exportieren")
                 print("")
                 print("Jede andere Eingabe wird als neues QSO interpretiert und eingelesen")
                 print("")
@@ -617,6 +703,13 @@ class QSOManager:
 
                 filename = self.log_file + ".txt"
                 self.txt_export(filename)
+                set_output_color("green")
+                print(f"Exported to: {filename}")
+            elif cmd == 'i':
+                self.check_compo()
+
+                filename = self.log_file + ".edi"
+                self.edi_export(filename)
                 set_output_color("green")
                 print(f"Exported to: {filename}")
             elif len(cmd) > 1:
