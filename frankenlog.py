@@ -378,7 +378,6 @@ class QSOManager:
             adifile.write(f"Generated for {self.my_info['call']} in {self.my_info['dok']} - Loc: {self.my_info['loc']}\n\n")
             adifile.write(f"<adif_ver:5>3.0.9\n")
             adifile.write(f"<programid:10>FrankenLog\n")
-            adifile.write(f"<USERDEF2:2:N>Nr\n")
             adifile.write(f"<EOH>\n\n")
 
             for q in self.qsos:
@@ -390,16 +389,21 @@ class QSOManager:
                 call = q.data['rx_call']
                 dok = q.data['rx_dok']
                 loc = q.data['rx_loc']
-                nr = q.data['rx_num']
+                rnr = q.data['rx_num']
+                tnr = q.data['tx_num']
 
                 adifile.write(f"<QSO_DATE:8>{d}\n")
                 adifile.write(f"<TIME_ON:4>{t}\n")
                 adifile.write(f"<CALL:{len(call)}>{call}\n")
                 adifile.write(f"<RST_SENT:2>{q.data['tx_rst']}\n")
                 adifile.write(f"<RST_RCVD:2>{q.data['rx_rst']}\n")
-                adifile.write(f"<DARC_DOK:{len(dok)}>{dok}\n")
+                if dok:
+                    adifile.write(f"<DARC_DOK:{len(dok)}>{dok}\n")
                 adifile.write(f"<GRIDSQUARE:{len(loc)}>{loc}\n")
-                adifile.write(f"<Nr:{len(nr)}>{nr}\n")
+                adifile.write(f"<SRX:{len(rnr)}>{rnr}\n")
+                adifile.write(f"<STX:{len(tnr)}>{tnr}\n")
+                adifile.write(f"<BAND:2>2M\n")
+                adifile.write(f"<MODE:3>SSB\n")
                 adifile.write(f"<EOR>\n\n")
 
     def txt_export(self, filename):
