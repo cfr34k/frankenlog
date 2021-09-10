@@ -554,29 +554,37 @@ class QSOManager:
             mydok  = self.my_info['dok']
             myloc  = self.my_info['loc']
 
-            mo = "PH" # FIXME?
-            mode = "SSB" # FIXME?
-
             total_score = 0
             for q in self.qsos:
                 total_score += round(q.stats['distance'])
 
+            gmt = time.gmtime(int(self.qsos[0].data['timestamp']))
+            tdate = time.strftime('%y%m%d', gmt)
+
             # EDI header
             edifile.write(f"[REG1TEST;1]\n")
 
+            edifile.write(f"TName=IARU VHF\n")
+            edifile.write(f"TDate={tdate};\n")
             edifile.write(f"PCall={mycall}\n")
+            edifile.write(f"PSect={self.my_info['section']}\n")
             edifile.write(f"PBand={band}\n")
             #edifile.write(f"CATEGORY-MODE: {mode}\n")
             edifile.write(f"PWWLo={myloc}\n")
             edifile.write(f"RName={self.my_info['name']}\n")
             edifile.write(f"PAdr1={self.my_info['addr']}\n")
             edifile.write(f"PAdr2={self.my_info['qth']}\n")
+            edifile.write(f"PClub={self.my_info['dok']}\n")
+            edifile.write(f"RHBBS={self.my_info['email']}\n")
+            edifile.write(f"RCall={mycall}\n")
+            edifile.write(f"SPowe={self.my_info['power']}\n")
+            edifile.write(f"SAnte={self.my_info['antenna']}\n")
 
             edifile.write(f"CQSOs={len(self.qsos)}\n")
             edifile.write(f"CQSOP={total_score}\n")
 
             # QSO header for double-check
-            edifile.write(f"[QSORecords:{len(self.qsos)}]\n")
+            edifile.write(f"[QSORecords;{len(self.qsos)}]\n")
 
             seen_locs = set()
             seen_calls = set()
@@ -584,7 +592,7 @@ class QSOManager:
             for q in self.qsos:
                 gmt = time.gmtime(int(q.data['timestamp']))
 
-                dt = time.strftime('%Y%m%d', gmt)
+                dt = time.strftime('%y%m%d', gmt)
                 tm = time.strftime('%H%M', gmt)
 
                 tx_rst = q.data['tx_rst']
@@ -600,7 +608,7 @@ class QSOManager:
                 if loc in seen_locs:
                     new_wwl = ''
                 else:
-                    new_wwl = 'Y'
+                    new_wwl = 'N'
                     seen_locs.add(loc)
 
                 if call in seen_calls:
@@ -729,10 +737,10 @@ class QSOManager:
                 print("Eingabe nicht erkannt.")
 
 def get_user_info(info_file_name):
-    keys = ['call', 'loc', 'dok', 'name', 'addr', 'qth']
-    names = ['Rufzeichen', 'Locator', 'DOK', 'Name', 'Straße und Hausnummer', 'PLZ/Ort']
-    query_tpl = ['dein {}', 'deinen {}', 'deinen {}', 'deinen {}n', 'deine {}', 'deine PLZ/deinen Ort']
-    check_regex = [None, locregex, None, None, None, None]
+    keys = ['call', 'loc', 'dok', 'name', 'addr', 'qth', 'email', 'antenna', 'power', 'section']
+    names = ['Rufzeichen', 'Locator', 'DOK', 'Name', 'Straße und Hausnummer', 'PLZ/Ort', 'E-Mail-Adresse', 'Antenne', 'Sendeleistung', 'Sektion']
+    query_tpl = ['dein {}', 'deinen {}', 'deinen {}', 'deinen {}n', 'deine {}', 'deine PLZ/deinen Ort', 'deine {}', 'deine {}', 'deine {} (in Watt)', 'deine {} (6H/SO/MO/SO-LP/MO-LP)']
+    check_regex = [None, locregex, None, None, None, None, None, None, re.compile(r'[0-9]+'), re.compile('^(6H|SO-LP|MO-LP|SO|MO)$')]
 
     my_info = {}
 
