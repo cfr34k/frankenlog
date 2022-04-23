@@ -26,8 +26,6 @@ import readline
 import helper
 from helper import set_output_color
 
-from templates import *
-
 # regular expressions for different parts of a QSO
 callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
 dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
@@ -392,104 +390,6 @@ class QSOManager:
                 adifile.write(f"<MODE:3>SSB\n")
                 adifile.write(f"<EOR>\n\n")
 
-    def txt_export(self, filename):
-        if not self.qsos:
-            set_output_color("yellow")
-            print("Keine QSOs im Log.")
-            return
-
-        # gather information
-        template_info = {}
-        template_info['my_call'] = self.my_info['call']
-        template_info['my_loc'] = self.my_info['loc']
-        template_info['my_dok'] = self.my_info['dok']
-        template_info['qth'] = self.my_info['qth']
-        template_info['addr'] = self.my_info['addr']
-        template_info['name'] = self.my_info['name']
-        template_info['nqsos'] = len(self.qsos)
-        template_info['today_de'] = time.strftime('%d.%m.%Y')
-
-        # choose strings based on selected competition class
-        if self.compo == 'C':
-            template_info['compo'] = 'C - 2m (alle Betriebsarten)'
-            template_info['band'] = '2 m'
-            band = '2'
-        elif self.compo == 'D':
-            template_info['compo'] = 'D - 70cm (alle Betriebsarten)'
-            template_info['band'] = '70 cm'
-            band = '70'
-        else:
-            template_info['compo'] = 'INVALID'
-            template_info['band'] = 'INVALID'
-            band = '???'
-
-        mode = 'SSB' # FIXME?
-
-        total_points = 0
-        dok_multi = 0
-        field_multi = 0
-
-        seen_doks = set()
-        seen_fields = set()
-
-        template_info['qsotable'] = ""
-
-        for i, q in enumerate(self.qsos):
-            q = self.qsos[i]
-
-            points = 0
-            if self.my_info['dok'] != q.data['rx_dok']:
-                points = round(q.stats['distance'])
-
-            total_points += points
-
-            is_dok_multi = q.stats['dok'] not in seen_doks and helper.DOKCountsAsMulti(q.stats['dok'])
-            is_field_multi = q.stats['field'] not in seen_fields
-
-            if is_dok_multi:
-                seen_doks.add(q.stats['dok'])
-                dok_multi += 1
-
-            if is_field_multi:
-                seen_fields.add(q.stats['field'])
-                field_multi += 1
-
-            sent = TXT_SENT_TEMPLATE.format(
-                    tx_dok = self.my_info['dok'],
-                    tx_loc = self.my_info['loc'],
-                    tx_rst = q.data['tx_rst'],
-                    tx_num = q.data['tx_num'],
-                )
-            rcvd = TXT_RCVD_TEMPLATE.format(**(q.data))
-
-            gmt = time.gmtime(int(q.data['timestamp']))
-
-            template_info['qsotable'] += TXT_QSO_TEMPLATE.format(
-                        nr = i + 1,
-                        date = time.strftime('%d%m%y', gmt),
-                        utc = time.strftime('%H%M', gmt),
-                        call = q.data['rx_call'],
-                        band = band,
-                        mode = mode,
-                        sent = sent,
-                        rcvd = rcvd,
-                        new_dok = q.stats['dok'] if is_dok_multi else '',
-                        new_loc = q.stats['field'] if is_field_multi else '',
-                        points = points
-                    ) + "\n"
-
-        multi = dok_multi + field_multi
-        score = multi * total_points
-
-        template_info['dok_multi'] = dok_multi
-        template_info['field_multi'] = field_multi
-        template_info['total_multi'] = multi
-        template_info['total_points'] = total_points
-        template_info['final_score'] = score
-
-        with open(filename, 'w') as txtfile:
-            txtfile.write(TXT_TEMPLATE.format(**template_info))
-
     def cabrillo_export(self, filename):
         if not self.qsos:
             set_output_color("yellow")
@@ -572,7 +472,6 @@ class QSOManager:
                 print("w - Auswertung anzeigen")
                 print("a - ADIF-Datei exportieren")
                 print("c - Cabrillo-Datei exportieren")
-                print("t - TXT-Datei exportieren")
                 print("")
                 print("Jede andere Eingabe wird als neues QSO interpretiert und eingelesen")
                 print("")
@@ -610,13 +509,6 @@ class QSOManager:
 
                 filename = self.log_file + ".cabrillo"
                 self.cabrillo_export(filename)
-                set_output_color("green")
-                print(f"Exported to: {filename}")
-            elif cmd == 't':
-                self.check_compo()
-
-                filename = self.log_file + ".txt"
-                self.txt_export(filename)
                 set_output_color("green")
                 print(f"Exported to: {filename}")
             elif len(cmd) > 1:
