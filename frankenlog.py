@@ -26,6 +26,8 @@ import readline
 import helper
 from helper import set_output_color
 
+VERSION = 0.3
+
 # regular expressions for different parts of a QSO
 callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
 dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
@@ -147,9 +149,9 @@ class QSO:
 
         print("{:4d} ".format(idx), end='')
         print("{:18s}".format(timestr), end='')
-        print("{:7s}".format(self.data['tx_rst']), end='')
+        print("{:7s}".format(self.data['tx_rst'] or '-'), end='')
         print("{:13s}".format(self.data['rx_call'] or '-'), end='')
-        print("{:7s}".format(self.data['rx_rst']), end='')
+        print("{:7s}".format(self.data['rx_rst'] or '-'), end='')
         print("{:8s}".format(self.data['rx_dok'] or '-'), end='')
         print("{:8s}".format(self.data['rx_loc'] or '-'), end='')
         if self.stats:
@@ -359,7 +361,7 @@ class QSOManager:
             # write header
             adifile.write(f"Generated for {self.my_info['call']} in {self.my_info['dok']} - Loc: {self.my_info['loc']}\n\n")
             adifile.write(f"<adif_ver:5>3.0.9\n")
-            adifile.write(f"<programid:10>FrankenLog\n")
+            adifile.write(f"<programid:10>FrankenLog v{VERSION}\n")
             adifile.write(f"<EOH>\n\n")
 
             for q in self.qsos:
@@ -410,7 +412,7 @@ class QSOManager:
             # Cabrillo header
             cabrillofile.write(f"START-OF-LOG: 3.0\n")
 
-            cabrillofile.write(f"CREATED-BY: Frankenlog v0.2\n")
+            cabrillofile.write(f"CREATED-BY: Frankenlog v{VERSION}\n")
             cabrillofile.write(f"CALLSIGN: {mycall}\n")
             cabrillofile.write(f"CATEGORY-BAND: {band}\n")
             cabrillofile.write(f"CATEGORY-MODE: {mode}\n")
@@ -419,9 +421,9 @@ class QSOManager:
             cabrillofile.write(f"ADDRESS: {self.my_info['addr']}\n")
             cabrillofile.write(f"ADDRESS: {self.my_info['qth']}\n")
 
-            # QSO header for double-check
-            cabrillofile.write("QSO: freq  mo datetime        call          rst nr  dok    loc    call          rst nr  dok    loc\n")
-            cabrillofile.write("QSO: ***** ** yyyy-mm-dd nnnn ************* nnn nnn ****** ****** ************* nnn nnn ****** ******\n")
+            # QSO header for double-check. Do not put these lines into the submitted log!
+            #cabrillofile.write("QSO: freq  mo datetime        call          rst dok    loc    call          rst dok    loc\n")
+            #cabrillofile.write("QSO: ***** ** yyyy-mm-dd nnnn ************* nnn ****** ****** ************* nnn ****** ******\n")
 
             for q in self.qsos:
                 gmt = time.gmtime(int(q.data['timestamp']))
@@ -440,12 +442,10 @@ class QSOManager:
                 cabrillofile.write(f"{datetime} ")
                 cabrillofile.write(f"{mycall:13s} ")
                 cabrillofile.write(f"{tx_rst:3s} ")
-                cabrillofile.write(f"{tx_nr:3s} ")
                 cabrillofile.write(f"{mydok:6s} ")
                 cabrillofile.write(f"{myloc:6s} ")
                 cabrillofile.write(f"{call:13s} ")
                 cabrillofile.write(f"{rx_rst:3s} ")
-                cabrillofile.write(f"{rx_nr:3s} ")
                 cabrillofile.write(f"{dok:6s} ")
                 cabrillofile.write(f"{loc:6s}\n")
 
