@@ -31,17 +31,15 @@ from templates import *
 # regular expressions for different parts of a QSO
 callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
 dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
-rstnumregex = re.compile('[0-9]+', re.IGNORECASE)
+rstregex = re.compile('[0-9]{2}', re.IGNORECASE)
 locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
 
 class QSO:
     NAME_MAP = {
             'timestamp': "Zeitstempel",
             'tx_rst': "Gesendetes RST",
-            'tx_num': "Gesendete Nummer",
             'rx_rst': "Empfangenes RST",
             'rx_call': "Empfangenes Rufzeichen",
-            'rx_num': "Empfangene Nummer",
             'rx_loc': "Empfangener Locator",
             'rx_dok': "Empfangener DOK"
         }
@@ -52,11 +50,9 @@ class QSO:
         self.data['timestamp'] = str(int(time.time()))
 
         self.data['tx_rst'] = "59"
-        self.data['tx_num'] = None
 
         self.data['rx_rst'] = "59"
         self.data['rx_call'] = None
-        self.data['rx_num'] = None
         self.data['rx_loc'] = None
         self.data['rx_dok'] = None
 
@@ -70,11 +66,6 @@ class QSO:
 
 
     def normalize_format(self):
-        if self.data['tx_num']:
-            self.data['tx_num'] = "{:03d}".format(int(self.data['tx_num']))
-        if self.data['rx_num']:
-            self.data['rx_num'] = "{:03d}".format(int(self.data['rx_num']))
-
         for k in ['rx_call', 'rx_loc', 'rx_dok']:
             if self.data[k]:
                 self.data[k] = self.data[k].upper()
@@ -143,9 +134,9 @@ class QSO:
     def print_table_header(self, term=True):
         print("QSO# ", end='')
         print("Zeit              ", end='')
-        print("TX RST/Nr.   ", end='')
+        print("TX RST ", end='')
         print("RX Rufz.     ", end='')
-        print("RX RST/Nr.   ", end='')
+        print("RX RST ", end='')
         print("RX DOK  ", end='')
         print("RX Loc. ", end='')
         print("Distanz ", end='')
@@ -158,9 +149,9 @@ class QSO:
 
         print("{:4d} ".format(idx), end='')
         print("{:18s}".format(timestr), end='')
-        print("{} {:10s}".format(self.data['tx_rst'], self.data['tx_num'] or '-'), end='')
+        print("{:7s}".format(self.data['tx_rst']), end='')
         print("{:13s}".format(self.data['rx_call'] or '-'), end='')
-        print("{} {:10s}".format(self.data['rx_rst'], self.data['rx_num'] or '-'), end='')
+        print("{:7s}".format(self.data['rx_rst']), end='')
         print("{:8s}".format(self.data['rx_dok'] or '-'), end='')
         print("{:8s}".format(self.data['rx_loc'] or '-'), end='')
         if self.stats:
@@ -185,8 +176,6 @@ class QSOManager:
 
             set_output_color("blue")
             print(f"{len(self.qsos)} QSOs geladen.")
-
-        self.next_number = len(self.qsos) + 1
 
     def load(self, log_file):
         with open(log_file, 'r') as f:
@@ -224,7 +213,7 @@ class QSOManager:
         parts = text.split(' ')
         parts.reverse() # search backwards
 
-        callfound = dokfound = rstnumfound = locfound = False
+        callfound = dokfound = rstfound = locfound = False
 
         call = dok = rst = num = loc = None
 
@@ -238,14 +227,11 @@ class QSOManager:
                     dokfound = True
                     continue
 
-            if not rstnumfound:
-                mo = rstnumregex.match(part)
+            if not rstfound:
+                mo = rstregex.match(part)
                 if mo:
-                    rstnum = mo.group(0)
-
-                    rst = rstnum[:2]
-                    num = rstnum[2:]
-                    rstnumfound = True
+                    rst = mo.group(0)
+                    rstfound = True
                     continue
 
             if not locfound:
@@ -267,13 +253,11 @@ class QSOManager:
                         callfound = True
 
         q = QSO(self.my_info,
-                tx_num=str(self.next_number),
                 tx_rst='59', # FIXME
                 rx_call=call,
                 rx_dok=dok,
                 rx_loc=loc,
-                rx_rst=rst,
-                rx_num=num)
+                rx_rst=rst)
 
         qsoidx = len(self.qsos)
         self.qsos.append(q)
@@ -389,8 +373,8 @@ class QSOManager:
                 call = q.data['rx_call']
                 dok = q.data['rx_dok']
                 loc = q.data['rx_loc']
-                rnr = q.data['rx_num']
-                tnr = q.data['tx_num']
+                rnr = q.data.get('rx_num')
+                tnr = q.data.get('tx_num')
 
                 adifile.write(f"<QSO_DATE:8>{d}\n")
                 adifile.write(f"<TIME_ON:4>{t}\n")
@@ -400,8 +384,10 @@ class QSOManager:
                 if dok:
                     adifile.write(f"<DARC_DOK:{len(dok)}>{dok}\n")
                 adifile.write(f"<GRIDSQUARE:{len(loc)}>{loc}\n")
-                adifile.write(f"<SRX:{len(rnr)}>{rnr}\n")
-                adifile.write(f"<STX:{len(tnr)}>{tnr}\n")
+                if rnr:
+                    adifile.write(f"<SRX:{len(rnr)}>{rnr}\n")
+                if tnr:
+                    adifile.write(f"<STX:{len(tnr)}>{tnr}\n")
                 adifile.write(f"<BAND:2>2M\n")
                 adifile.write(f"<MODE:3>SSB\n")
                 adifile.write(f"<EOR>\n\n")
@@ -547,8 +533,6 @@ class QSOManager:
                 call = q.data['rx_call']
                 dok = q.data['rx_dok']
                 loc = q.data['rx_loc']
-                rx_nr = q.data['rx_num']
-                tx_nr = q.data['tx_num']
 
                 cabrillofile.write("QSO: ")
                 cabrillofile.write(f"{freq:5d} ")
@@ -573,7 +557,7 @@ class QSOManager:
 
         while True:
             set_output_color("magenta")
-            print(f"\n<<< 59 {self.next_number:03d} {self.my_info['dok']} {self.my_info['loc']}")
+            print(f"\n<<< 59 {self.my_info['dok']} {self.my_info['loc']}")
             set_output_color("default")
             cmd = input('> ')
 
@@ -582,7 +566,6 @@ class QSOManager:
                 print("Gültige Befehle:\n")
                 print("h - Diese Hilfe anzeigen")
                 print("q - Programm beenden")
-                print("n - Nächste ausgehende Nummer setzen")
                 print("e - Das letzte QSO bearbeiten")
                 print("b - QSO nach Nummer bearbeiten")
                 print("l - QSOs auflisten")
@@ -596,17 +579,6 @@ class QSOManager:
             elif cmd == 'q':
                 self.save()
                 break
-            elif cmd == 'n':
-                nstr = input('Nächste ausgehende Nummer> ')
-
-                set_output_color("red")
-                if not nstr:
-                    print("Leere Eingabe -> Nummer nicht verändert.")
-                else:
-                    try:
-                        self.next_number = int(nstr)
-                    except:
-                        print(f"{nstr} ist keine Zahl")
             elif cmd == 'e':
                 self.edit_last_qso()
                 self.save()
@@ -650,8 +622,6 @@ class QSOManager:
             elif len(cmd) > 1:
                 q, qsoidx = self.add_qso_from_string(cmd)
                 self.save()
-
-                self.next_number += 1
 
                 set_output_color("cyan")
 
