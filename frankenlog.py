@@ -450,7 +450,7 @@ class QSOManager:
                 cabrillofile.write(f"{loc:6s}\n")
 
             # Cabrillo footer
-            cabrillofile.write(f"END-OF-LOG\n")
+            cabrillofile.write(f"END-OF-LOG:\n")
 
     def loop(self):
         """Main loop."""
