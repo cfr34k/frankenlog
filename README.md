@@ -30,6 +30,25 @@ QSO# Zeit              TX RST/Nr.   RX Rufz.     RX RST/Nr.   RX DOK  RX Loc.
   20 2019-05-12 13:46  59 021       DA0XX        59 008       B99     JN59MO  
 ```
 
+## Einrichtung und Verwendung
+
+Frankenlog ist ein Skript, das in jeder Python-3-Umgebung ausgeführt werden
+kann. Es werden keine externen Abhängigkeiten verwendet.
+
+Das Skript kann wie folgt gestartet werden:
+
+```sh
+./frankenlog.py -i meine.info -o klasse_c.log
+```
+
+In der Datei `meine.info` wird anschließend die Information über die eigene
+Station gespeichert, in `klasse_c.log` landen die Logeinträge. Beide Dateien
+können natürlich beliebig benannt werden.
+
+Nach dem Start fragt das Programm die für den Log-Export erforderlichen
+Informationen zur Station ab. Sobald alles eingetragen wurde, kann direkt mit
+dem Loggen begonnen werden.
+
 ## Features
 
 - Automatisches Zerlegen der Eingabe nach
@@ -42,7 +61,7 @@ QSO# Zeit              TX RST/Nr.   RX Rufz.     RX RST/Nr.   RX DOK  RX Loc.
 - Nachträgliche Korrektur beliebiger QSOs (b)
 - Auswertung mit Punktzahl- und Multiplikator-Berechnung
 - ADIF-Export (kann im HamFranken eingelesen werden)
-- TXT-Export (entspricht der "eLog-Gesamtdatei" von HamFranken)
+- Cabrillo-Export (einzusendendes Format seit 2022)
 
 Bei der Korrektur gibt es keine Einschränkungen durch die Mustererkennung. Das
 ist nützlich, wenn z.B. ein Sonder-DOK nicht automatisch erkannt wurde.
