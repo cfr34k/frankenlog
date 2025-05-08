@@ -30,6 +30,8 @@ QSO# Zeit              TX RST/Nr.   RX Rufz.     RX RST/Nr.   RX DOK  RX Loc.
   20 2019-05-12 13:46  59 021       DA0XX        59 008       B99     JN59MO  
 ```
 
+Sollte einmal eine Zeile fehlerhaft zerlegt werden, kann das QSO nachträglich korrigiert werden. Dabei wird auch die ursprüngliche Eingabezeile als Referenz angezeigt.
+
 ## Einrichtung und Verwendung
 
 Frankenlog ist ein Skript, das in jeder Python-3-Umgebung ausgeführt werden
