@@ -136,7 +136,6 @@ class QSO:
         self.stats = {}
         self.stats['distance'] = helper.DistanceBetweenLocs(tx_loc, rx_loc)
         self.stats['dok']    = self.data['rx_dok']
-        self.stats['field']  = rx_loc[:4]
 
     def print_table_header(self, term=True):
         print("QSO# ", end='')
@@ -301,12 +300,10 @@ class QSOManager:
         multi = 0
 
         seen_doks = set()
-        seen_fields = set()
 
         self.qsos[0].print_table_header(term=False)
         print("Punkte ", end='')
         print("DOK-Multi ", end='')
-        print("Loc-Multi ", end='')
         print()
 
         for i in range(len(self.qsos)):
@@ -319,14 +316,9 @@ class QSOManager:
             total_points += points
 
             dok_multi = q.stats['dok'] not in seen_doks and helper.DOKCountsAsMulti(q.stats['dok'])
-            field_multi = q.stats['field'] not in seen_fields
 
             if dok_multi:
                 seen_doks.add(q.stats['dok'])
-                multi += 1
-
-            if field_multi:
-                seen_fields.add(q.stats['field'])
                 multi += 1
 
             if points > 1000:
@@ -337,7 +329,6 @@ class QSOManager:
             self.qsos[i].print_table_data(i, term=False)
             print(f"{points:6d} ", end='')
             print(f"{dok_multi:9} ", end='')
-            print(f"{field_multi:9} ", end='')
             print()
 
             set_output_color("default")
