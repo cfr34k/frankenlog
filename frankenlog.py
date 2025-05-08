@@ -352,8 +352,16 @@ class QSOManager:
             set_output_color("yellow")
             print("Teilnahmeklasse nicht gesetzt!")
             set_output_color("default")
-            compo = input("Wähle die Klasse aus (C = 2m, D = 70cm): ").upper()
-            if compo not in ['C', 'D']:
+            print("Klassen:\n")
+            print("B = 80m/40m SSB")
+            print("D = 80m/40m SSB - 100 Watt")
+            print("F = 10m SSB")
+            print("K = 2m SSB")
+            print("L = 70cm SSB")
+            print()
+
+            compo = input("Wähle die Klasse aus: ").upper()
+            if compo not in "BDFKL":
                 print("Eingabe nicht erkannt. Nur 1 Buchstabe darf eingegeben werden")
                 continue
             else:
@@ -407,8 +415,8 @@ class QSOManager:
             return
 
         with open(filename, 'w') as cabrillofile:
-            freq = {'C': 144, 'D': 432}[self.compo]
-            band = {'C': '2M', 'D': '432'}[self.compo]
+            freq = {'B': 3500,  'D': 3500,  'F': 28000, 'K':  144, 'L':  432}[self.compo]
+            band = {'B': '80M', 'D': '80M', 'F': '10M', 'K': '2M', 'L': '432'}[self.compo]
 
             mycall = self.my_info['call']
             mydok  = self.my_info['dok']
@@ -583,6 +591,9 @@ parser.add_argument('-o', '--output-file', dest='output_file', type=str, require
 parser.add_argument('-i', '--info-file', dest='info_file', type=str, required=True, help='Datei mit Benutzerinformationen. Wird angelegt, wenn sie nicht existiert. Fehlende Infos werden abgefragt.')
 
 args = parser.parse_args()
+
+set_output_color("yellow")
+print("Achtung: nur die SSB-Klassen werden unterstützt!")
 
 my_info = get_user_info(args.info_file)
 
