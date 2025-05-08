@@ -56,6 +56,8 @@ class QSO:
         self.data['rx_loc'] = None
         self.data['rx_dok'] = None
 
+        self.data['parsed_line'] = None
+
         self.data.update(kwargs)
 
         self.my_info = my_info
@@ -83,7 +85,12 @@ class QSO:
         while cmd != 'q':
             edit_order = []
 
+            print(f"\nOriginaleingabe: {self.data.get('parsed_line')}\n")
+
             for k, v in self.NAME_MAP.items():
+                if k == 'parsed_line':
+                    continue
+
                 if k[0] == 'r':
                     set_output_color("green")
                 else:
@@ -257,7 +264,8 @@ class QSOManager:
                 rx_call=call,
                 rx_dok=dok,
                 rx_loc=loc,
-                rx_rst=rst)
+                rx_rst=rst,
+                parsed_line=text)
 
         qsoidx = len(self.qsos)
         self.qsos.append(q)
