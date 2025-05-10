@@ -443,18 +443,32 @@ class QSOManager:
                 dok = q.data['rx_dok']
                 loc = q.data['rx_loc']
 
-                cabrillofile.write("QSO: ")
-                cabrillofile.write(f"{freq:5d} ")
-                cabrillofile.write(f"{mo} ")
-                cabrillofile.write(f"{datetime} ")
-                cabrillofile.write(f"{mycall:13s} ")
-                cabrillofile.write(f"{tx_rst:3s} ")
-                cabrillofile.write(f"{mydok:6s} ")
-                cabrillofile.write(f"{myloc:6s} ")
-                cabrillofile.write(f"{call:13s} ")
-                cabrillofile.write(f"{rx_rst:3s} ")
-                cabrillofile.write(f"{dok:6s} ")
-                cabrillofile.write(f"{loc:6s}\n")
+                if self.compo in "KL":
+                    # VHF/UHF competitions where the locator is included
+                    cabrillofile.write("QSO: ")
+                    cabrillofile.write(f"{freq:5d} ")
+                    cabrillofile.write(f"{mo} ")
+                    cabrillofile.write(f"{datetime} ")
+                    cabrillofile.write(f"{mycall:13s} ")
+                    cabrillofile.write(f"{tx_rst:3s} ")
+                    cabrillofile.write(f"{mydok:6s} ")
+                    cabrillofile.write(f"{myloc:6s} ")
+                    cabrillofile.write(f"{call:13s} ")
+                    cabrillofile.write(f"{rx_rst:3s} ")
+                    cabrillofile.write(f"{dok:6s} ")
+                    cabrillofile.write(f"{loc:6s}\n")
+                else:
+                    # shortwave competitions without the locator
+                    cabrillofile.write("QSO: ")
+                    cabrillofile.write(f"{freq:5d} ")
+                    cabrillofile.write(f"{mo} ")
+                    cabrillofile.write(f"{datetime} ")
+                    cabrillofile.write(f"{mycall:13s} ")
+                    cabrillofile.write(f"{tx_rst:3s} ")
+                    cabrillofile.write(f"{mydok:6s} ")
+                    cabrillofile.write(f"{call:13s} ")
+                    cabrillofile.write(f"{rx_rst:3s} ")
+                    cabrillofile.write(f"{dok:6s}\n")
 
             # Cabrillo footer
             cabrillofile.write(f"END-OF-LOG:\n")
