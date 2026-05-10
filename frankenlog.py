@@ -30,7 +30,7 @@ VERSION = 0.3
 
 # regular expressions for different parts of a QSO
 callregex = re.compile('([a-z0-9]+/)?[a-z]{1,2}[0-9]+[a-z]+(/p|/m|/mm|/am)?', re.IGNORECASE)
-dokregex = re.compile('([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
+dokregex = re.compile('nm|([0-9]+)?[a-z][0-9]{2}', re.IGNORECASE)
 rstregex = re.compile('[0-9]{2}', re.IGNORECASE)
 locregex = re.compile('[a-z]{2}[0-9]{2}[a-z]{2}', re.IGNORECASE)
 
